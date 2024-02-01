@@ -1,0 +1,17 @@
+[Unit]
+Description=GitHub Actions Runner
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={{ runner_workdir }}/run.sh
+WorkingDirectory={{ runner_workdir }}
+StandardOutput=append:/var/log/gitlab-runner.log
+StandardError=append:/var/log/gitlab-runner.log
+Restart=always
+RestartSec=3
+User=nobody
+Group=nogroup
+
+[Install]
+WantedBy=multi-user.target

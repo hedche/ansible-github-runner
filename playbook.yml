@@ -1,0 +1,44 @@
+---
+- name: Setup GitHub Runner
+  hosts: gitlab-runners
+  become: true
+
+  tasks:
+    - name: Create {{ runner_workdir }}
+      file:
+        path: "{{ runner_workdir }}"
+        state: directory
+
+    - name: Download and extract GitHub Actions Runner
+      ansible.builtin.unarchive:
+        src: https://github.com/actions/runner/releases/download/v2.312.0/actions-runner-linux-x64-2.312.0.tar.gz
+        dest: "{{ runner_workdir }}"
+        remote_src: true
+
+    - name: Configure GitHub Actions Runner
+      command: |
+        ./config.sh --url {{ github_repo_url }} \
+        --token {{ access_token }} \
+        --name {{ runner_name }} \
+        --labels {{ runner_labels }} \
+        --work {{ runner_workdir }}
+      args:
+        chdir: "{{ runner_workdir }}"
+
+    - name: Create systemd unit file for GitHub Runner
+      ansible.builtin.template:
+        src: github-runner.service.j2
+        dest: /etc/systemd/system/github-runner.service
+      notify: Reload systemd
+
+    - name: Start and enable the GitHub Runner service
+      ansible.builtin.service:
+        name: github-runner
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        name: github-runner
+        state: reloaded
