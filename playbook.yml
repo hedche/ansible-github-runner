@@ -8,20 +8,26 @@
       file:
         path: "{{ runner_workdir }}"
         state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: 0757
 
     - name: Download and extract GitHub Actions Runner
+      become: false
       ansible.builtin.unarchive:
         src: https://github.com/actions/runner/releases/download/v2.312.0/actions-runner-linux-x64-2.312.0.tar.gz
         dest: "{{ runner_workdir }}"
         remote_src: true
 
     - name: Configure GitHub Actions Runner
+      become: false
       command: |
-        ./config.sh --url {{ github_repo_url }} \
-        --token {{ access_token }} \
+        ./config.sh --url "{{ github_repo_url }}" \
+        --token "{{ access_token }}" \
         --name {{ runner_name }} \
         --labels {{ runner_labels }} \
-        --work {{ runner_workdir }}
+        --work {{ runner_workdir }} \
+        --unattended
       args:
         chdir: "{{ runner_workdir }}"
 
@@ -41,4 +47,4 @@
     - name: Reload systemd
       ansible.builtin.systemd:
         name: github-runner
-        state: reloaded
+        state: restarted
