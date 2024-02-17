@@ -19,6 +19,12 @@
         dest: "{{ runner_workdir }}"
         remote_src: true
 
+    - name: Remove runner config (for idempotency)
+      become: false
+      command: "{{ runner_workdir }}/config.sh remove --token {{ access_token }}"
+      ignore_errors: true
+      when: force | default(false) | bool
+
     - name: Configure GitHub Actions Runner
       become: false
       command: |
