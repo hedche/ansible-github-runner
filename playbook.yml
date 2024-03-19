@@ -1,56 +1,68 @@
 ---
 - name: Setup GitHub Runner
-  hosts: gitlab-runners
+  hosts: github-runners
   become: true
 
   tasks:
-    - name: Create {{ runner_workdir }}
-      file:
-        path: "{{ runner_workdir }}"
-        state: directory
-        owner: ubuntu
-        group: ubuntu
-        mode: 0757
+    - name: Create group github-runner
+      group:
+        name: "{{ github_runner_user_group }}"
+        system: true
+
+    - name: Create user github-runner
+      user:
+        name: "{{ github_runner_user_group }}"
+        group: "{{ github_runner_user_group }}"
+        shell: /bin/bash
+        system: true
+
+#    - name: Create "/home/{{ github_runner_user_group }}
+#      file:
+#        path: "{{ runner_workdir }}"
+#        state: directory
+#        owner: "{{ github_runner_user_group }}"
+#        group: "{{ github_runner_user_group }}"
+#        mode: 0757
 
     - name: Download and extract GitHub Actions Runner
-      become: false
-      ansible.builtin.unarchive:
+      unarchive:
         src: https://github.com/actions/runner/releases/download/v2.312.0/actions-runner-linux-x64-2.312.0.tar.gz
-        dest: "{{ runner_workdir }}"
+        dest: "/home/{{ github_runner_user_group }}"
         remote_src: true
+        owner: "{{ github_runner_user_group }}"
+        group: "{{ github_runner_user_group }}"
 
-    - name: Remove runner config (for idempotency)
-      become: false
-      command: "{{ runner_workdir }}/config.sh remove --token {{ access_token }}"
-      ignore_errors: true
-      when: force | default(false) | bool
+#    - name: Remove runner config (for idempotency)
+#      command: "/home/{{ github_runner_user_group }}/config.sh remove --token {{ access_token }}"
+#      ignore_errors: true
+#      when: force | default(false) | bool
 
     - name: Configure GitHub Actions Runner
-      become: false
+      become_user: "{{ github_runner_user_group }}"
       command: |
         ./config.sh --url "{{ github_repo_url }}" \
         --token "{{ access_token }}" \
         --name {{ runner_name }} \
         --labels {{ runner_labels }} \
-        --work {{ runner_workdir }} \
+        --work /home/{{ github_runner_user_group }} \
         --unattended
       args:
-        chdir: "{{ runner_workdir }}"
+        chdir: "/home/{{ github_runner_user_group }}"
 
     - name: Create systemd unit file for GitHub Runner
-      ansible.builtin.template:
+      template:
         src: github-runner.service.j2
         dest: /etc/systemd/system/github-runner.service
       notify: Reload systemd
 
     - name: Start and enable the GitHub Runner service
-      ansible.builtin.service:
+      service:
         name: github-runner
         state: started
         enabled: yes
 
   handlers:
     - name: Reload systemd
-      ansible.builtin.systemd:
+      systemd:
         name: github-runner
         state: restarted
